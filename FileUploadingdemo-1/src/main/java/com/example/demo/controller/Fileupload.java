@@ -14,7 +14,11 @@ import java.util.stream.Collectors;
 
 
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.core.io.Resource;
+import org.springframework.core.io.UrlResource;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.CrossOrigin;
@@ -49,6 +53,8 @@ public class Fileupload {
 		Files.copy(multipartFile.getInputStream(), fileStorage, StandardCopyOption.REPLACE_EXISTING);
 		
 		file.setName(multipartFile.getOriginalFilename());
+	
+		
 		frepo.save(file);
 		return ResponseEntity.ok(file);
 	}
@@ -86,6 +92,29 @@ public class Fileupload {
 	            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
 	        }
 	        return ResponseEntity.ok().build();
+	    } else {
+	        return ResponseEntity.notFound().build();
+	    }
+	}
+	
+	@GetMapping("/downloadfile/{id}")
+	public ResponseEntity<Resource> downloadFile(@PathVariable("id") String id) throws IOException {
+	    Optional<FileModel> fileOptional = frepo.findById(id);
+	    if (fileOptional.isPresent()) {
+	        FileModel file = fileOptional.get();
+	        Path filePath = Paths.get(dir, file.getName()).toAbsolutePath().normalize();
+	        Resource resource = new UrlResource(filePath.toUri());
+	        if (resource.exists()) {
+	            HttpHeaders headers = new HttpHeaders();
+	            headers.add(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + resource.getFilename() + "\"");
+	            return ResponseEntity.ok()
+	                    .headers(headers)
+	                    .contentLength(resource.contentLength())
+	                    .contentType(MediaType.parseMediaType("application/octet-stream"))
+	                    .body(resource);
+	        } else {
+	            return ResponseEntity.notFound().build();
+	        }
 	    } else {
 	        return ResponseEntity.notFound().build();
 	    }
